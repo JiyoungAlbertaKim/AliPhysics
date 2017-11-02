@@ -157,6 +157,7 @@ set(SRCS
     UserTasks/AliAnalysisTaskIDFragmentationFunction.cxx
     UserTasks/AliAnalysisTaskEmcalJetCDF.cxx
     UserTasks/AliAnalysisTaskEmcalJetHadCorQA.cxx
+    UserTasks/AliAnalysisTaskEmcalJetHadCorrAA.cxx
     UserTasks/AliAnalysisTaskEmcalJetHadEPpid.cxx
     UserTasks/AliAnalysisTaskEmcalJetHCorrelations.cxx
     UserTasks/AliAnalysisTaskEmcalJetMassBkg.cxx
