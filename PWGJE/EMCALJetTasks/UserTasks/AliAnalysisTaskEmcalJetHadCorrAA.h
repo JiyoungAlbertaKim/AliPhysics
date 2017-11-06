@@ -82,7 +82,7 @@ class AliAnalysisTaskEmcalJetHadCorrAA : public AliAnalysisTaskEmcalJet {
  private:
   AliAnalysisTaskEmcalJetHadCorrAA(const AliAnalysisTaskEmcalJetHadCorrAA&)           ; // not implemented
   AliAnalysisTaskEmcalJetHadCorrAA &operator=(const AliAnalysisTaskEmcalJetHadCorrAA&); // not implemented
-  TList *flist; //output  
+  //TList *flist; //output  
 
   /// \cond CLASSIMP
   ClassDef(AliAnalysisTaskEmcalJetHadCorrAA, 8);

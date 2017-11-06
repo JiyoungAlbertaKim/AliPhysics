@@ -143,6 +143,8 @@ void AliAnalysisTaskEmcalJetHadCorrAA::UserCreateOutputObjects()
   fEventCuts.AddQAplotsToList(fList);
   fOutput->Add(fList);*/    
 
+  fEventCuts.AddQAplotsToList(fOutput);
+
   fHistMixNumOfEventsInPool = new TH3F("fHistMixNumOfEventsInPool", "histMixNumOfEventsInPool;Centrality [%];Z vertex [cm];N_{events}", 100, 0, 100, 20, -10, 10, 1500, 0, 1500); 
   fOutput->Add(fHistMixNumOfEventsInPool);
 
