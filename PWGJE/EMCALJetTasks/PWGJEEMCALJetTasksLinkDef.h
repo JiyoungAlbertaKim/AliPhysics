@@ -80,6 +80,7 @@
 #pragma link C++ class AliAnalysisTaskEmcalJetCDF+;
 #pragma link C++ namespace NS_AliAnalysisTaskEmcalJetCDF+;
 #pragma link C++ class AliAnalysisTaskEmcalJetHadCorQA+;
+#pragma link C++ class AliAnalysisTaskEmcalJetHadCorrAA+;
 #pragma link C++ class AliAnalysisTaskEmcalJetHadEPpid+;
 #pragma link C++ class AliAnalysisTaskEmcalJetMass+;
 #pragma link C++ class AliAnalysisTaskEmcalJetMassBkg+;
