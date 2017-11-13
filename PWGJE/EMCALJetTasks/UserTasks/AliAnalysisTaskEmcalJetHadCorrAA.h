@@ -22,7 +22,7 @@
 #include "AliEventPoolManager.h"
 #include "TObjArray.h"
 #include "AliPIDResponse.h"
-#include "AliMultSelection.h"
+//#include "AliMultSelection.h"
 #include "AliEventCuts.h"
 
 /**
@@ -59,6 +59,7 @@ class AliAnalysisTaskEmcalJetHadCorrAA : public AliAnalysisTaskEmcalJet {
 
   void                        DoJetLoop()                                       ;
   void                        DoTrackLoop()                                     ;
+  void                        DoMCTrackLoop()                                     ;
   void                        DoMixLoop(TObjArray* trkArray, TObjArray* MxtrkArray, int cBin, int zBin, int nMix);/// To fill mixed histograms
 
   void                        SetupForMixing()                                  ;//Call EventPoolManager - JY
@@ -71,7 +72,7 @@ class AliAnalysisTaskEmcalJetHadCorrAA : public AliAnalysisTaskEmcalJet {
   TObjArray*                  JetsArray                                         ;///< tracks array for mixing
   Int_t                       fNzvtxBins                                        ;///< Number of z vertex Bins for AllocateMixHistograms 
   AliPIDResponse*             fPIDResponse                                      ;//! PID response object
-  AliMultSelection*           fMultSelection                                    ;//! MultSelection object for centrality
+  //AliMultSelection*           fMultSelection                                    ;//! MultSelection object for centrality
   TH1                        *fHistCentrality_jy;             //!<!event centrality distribution
   TH1                        *fHistQACentrality_jy;           //!<!Centrality QA plot about fEvSelCode - modified by JY
   TH3                        *fHistMixNumOfEventsInPool;             //!<!event centrality distribution
@@ -82,7 +83,6 @@ class AliAnalysisTaskEmcalJetHadCorrAA : public AliAnalysisTaskEmcalJet {
  private:
   AliAnalysisTaskEmcalJetHadCorrAA(const AliAnalysisTaskEmcalJetHadCorrAA&)           ; // not implemented
   AliAnalysisTaskEmcalJetHadCorrAA &operator=(const AliAnalysisTaskEmcalJetHadCorrAA&); // not implemented
-  //TList *flist; //output  
 
   /// \cond CLASSIMP
   ClassDef(AliAnalysisTaskEmcalJetHadCorrAA, 8);

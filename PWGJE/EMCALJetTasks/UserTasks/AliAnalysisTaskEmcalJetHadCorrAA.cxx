@@ -35,6 +35,7 @@ Author : Jiyoung Kim, jiyoung.kim@cern.ch */
 #include "AliRhoParameter.h"
 #include "AliJetContainer.h"
 #include "AliParticleContainer.h"
+#include "AliMCParticleContainer.h"
 #include "AliClusterContainer.h"
 
 #include "AliAODHeader.h"
@@ -68,9 +69,6 @@ AliAnalysisTaskEmcalJetHadCorrAA::AliAnalysisTaskEmcalJetHadCorrAA() :
   JetsArray(0x0),
   fNzvtxBins(11),
   fPIDResponse(0x0),
-  fMultSelection(0x0),
-  fHistCentrality_jy(0),
-  fHistQACentrality_jy(0),
   fHistMixNumOfEventsInPool(0),
   fHistMixNumOfTracksInPool(0),
   doMakeQAplot(kFALSE),
@@ -95,9 +93,6 @@ AliAnalysisTaskEmcalJetHadCorrAA::AliAnalysisTaskEmcalJetHadCorrAA(const char *n
   fHistManager(name),
   fNzvtxBins(11),
   fPIDResponse(0x0),
-  fMultSelection(0x0),
-  fHistCentrality_jy(0),
-  fHistQACentrality_jy(0), 
   fHistMixNumOfEventsInPool(0),
   fHistMixNumOfTracksInPool(0),
   doMakeQAplot(kFALSE),
@@ -131,28 +126,43 @@ void AliAnalysisTaskEmcalJetHadCorrAA::UserCreateOutputObjects()
   AllocateJetHistograms();
   AllocateMixHistograms();
 
-  TIter next(fHistManager.GetListOfHistograms());
-  TObject* obj = 0;
-  while ((obj = next())) {
-    fOutput->Add(obj);
-  }
+  fEventCut.AddQAplotsToList(fOutput);
+
+  // definition of QA histograms
+  TString histname;
+  TString histtitle;
+  TString groupname = "BasicQA";
+  fHistManager.CreateHistoGroup(groupname);
+
+  histname = TString::Format("%s/hEventStatistics", groupname.Data());
+  histtitle = TString::Format("%s;Applied cuts;Number of selected events", histname.Data());
+  fHistManager.CreateTH1(histname, histtitle, 10, 0, 10);
+  fHistManager.FindObject(histname)->SetBit(TH1::kCanRebin);
+
+  histname = TString::Format("%s/hEventStatistics_2D", groupname.Data());
+  histtitle = TString::Format("%s;Applied cuts;Centrality (%);Number of selected events", histname.Data());
+  fHistManager.CreateTH2(histname, histtitle, 10, 0, 10, 100, 0, 100);
+  fHistManager.FindObject(histname)->SetBit(TH2::kCanRebin); 
  
-  // pileup rejection qa figures
-  /*fList = new TList();
-  fList->SetOwner(true);  
-  fEventCuts.AddQAplotsToList(fList);
-  fOutput->Add(fList);*/    
-
-  fEventCuts.AddQAplotsToList(fOutput);
-
+  histname = TString::Format("%s/hCentrality", groupname.Data());
+  histtitle = TString::Format("Event Centrality distribution;Centrality (%);counts", histname.Data());
+  fHistManager.CreateTH1(histname, histtitle, 100, 0, 100);
+ 
   fHistMixNumOfEventsInPool = new TH3F("fHistMixNumOfEventsInPool", "histMixNumOfEventsInPool;Centrality [%];Z vertex [cm];N_{events}", 100, 0, 100, 20, -10, 10, 1500, 0, 1500); 
   fOutput->Add(fHistMixNumOfEventsInPool);
 
   fHistMixNumOfTracksInPool = new TH3F("fHistMixNumOfTracksInPool","histMixNumOfTracksInPool;Centrality [%];Z vertex [cm];N_{tracks}", 100, 0, 100, 20, -10, 10, 700, 0, 70000); 
   fOutput->Add(fHistMixNumOfTracksInPool);
 
+
   // Call for AliEventPoolManager (setup for mixing)  
   SetupForMixing();
+
+  TIter next(fHistManager.GetListOfHistograms());
+  TObject* obj = 0;
+  while ((obj = next())) {
+    fOutput->Add(obj);
+  }
 
   PostData(1, fOutput); // Post data for ALL output slots > 0 here.
 }
@@ -462,6 +472,7 @@ Bool_t AliAnalysisTaskEmcalJetHadCorrAA::FillHistograms()
 {
   DoJetLoop();
   DoTrackLoop();
+  DoMCTrackLoop();
 
   return kTRUE;
 }
@@ -704,6 +715,7 @@ void AliAnalysisTaskEmcalJetHadCorrAA::DoTrackLoop()
   AliClusterContainer* clusCont = GetClusterContainer(0);
 
   TObjArray *trkArray = new TObjArray; //Track array for event-mixing 
+  trkArray->SetOwner(kTRUE);
 
   Double_t zvertex = -999;
   zvertex = InputEvent()->GetPrimaryVertex()->GetZ();
@@ -831,93 +843,6 @@ void AliAnalysisTaskEmcalJetHadCorrAA::DoTrackLoop()
             fHistManager.FillTH2(histname, P, nSigmaProton_TOF);
           }  
         }
-
-        
-/*
-///////// trial
-
- // Fill PID qa histograms for the TOF
-  //   Here also the TPC histograms after TOF selection are filled
-  //
-
-  AliVEvent *event=InputEvent();
-
-  Int_t ntracks=event->GetNumberOfTracks();
-  for(Int_t itrack = 0; itrack < ntracks; itrack++){
-    AliVTrack *track=(AliVTrack*)event->GetTrack(itrack);
-
-    //
-    //basic track cuts
-    //
-    ULong_t status=track->GetStatus();
-    // not that nice. status bits not in virtual interface
-    // TPC refit + ITS refit +
-    // TOF out + TOFpid +
-    // kTIME
-    if (!((status & AliVTrack::kTPCrefit) == AliVTrack::kTPCrefit) ||
-        !((status & AliVTrack::kITSrefit) == AliVTrack::kITSrefit) ||
-//         !( (status & AliVTrack::kTPCpid  ) == AliVTrack::kTPCpid ) || //removes light nuclei, so it is out for the moment
-        !((status & AliVTrack::kTOFout  ) == AliVTrack::kTOFout  ) ||
-        //!((status & AliVTrack::kTOFpid  ) == AliVTrack::kTOFpid  ) || // not valid any longer with new TOF structure
-        !((status & AliVTrack::kTIME    ) == AliVTrack::kTIME    ) ) continue;
-
-    Float_t nCrossedRowsTPC = track->GetTPCClusterInfo(2,1);
-    Float_t  ratioCrossedRowsOverFindableClustersTPC = 1.0;
-    if (track->GetTPCNclsF()>0) {
-      ratioCrossedRowsOverFindableClustersTPC = nCrossedRowsTPC/track->GetTPCNclsF();
-    }
-
-    if ( nCrossedRowsTPC<70 || ratioCrossedRowsOverFindableClustersTPC<.8 ) continue;
-
-
-    Double_t mom=track->P();
-    Double_t momTPC=track->GetTPCmomentum();
-
-    for (Int_t ispecie=0; ispecie<AliPID::kSPECIESC; ++ispecie){
-      //TOF nSigma
-      Double_t nSigmaTOF=fPIDResponse->NumberOfSigmasTOF(track, (AliPID::EParticleType)ispecie);
-      Double_t nSigmaTPC=fPIDResponse->NumberOfSigmasTPC(track, (AliPID::EParticleType)ispecie);
-
-      //TPC after TOF cut
-      TH2 *h=(TH2*)fListQAtpctof->At(ispecie);
-      if (h && TMath::Abs(nSigmaTOF)<3.) h->Fill(momTPC,nSigmaTPC);
-
-      //TOF after TPC cut
-      h=(TH2*)fListQAtpctof->At(ispecie+AliPID::kSPECIESC);
-      if (h && TMath::Abs(nSigmaTPC)<3.) h->Fill(mom,nSigmaTOF);
-
-      //EMCAL after TOF and TPC cut
-      h=(TH2*)fListQAtpctof->At(ispecie+2*AliPID::kSPECIESC);
-      if (h && TMath::Abs(nSigmaTOF)<3. && TMath::Abs(nSigmaTPC)<3. ){
-
-  Int_t nMatchClus = track->GetEMCALcluster();
-  Double_t pt      = track->Pt();
-  Double_t eop     = -1.;
-
-  if(nMatchClus > -1){
-
-    AliVCluster *matchedClus = (AliVCluster*)event->GetCaloCluster(nMatchClus);
-
-    if(matchedClus){
-
-      // matched cluster is EMCAL
-      if(matchedClus->IsEMCAL()){
-
-        Double_t fClsE       = matchedClus->E();
-        eop                  = fClsE/mom;
-
-        h->Fill(pt,eop);
-
-
-      }
-    }
-  }
-      }
-    }
-  }
-////////////// here !!!
-*/
-
       }// PID
     }// partCont->accepted track loop
     histname = TString::Format("%s/histNTracks_%d", groupname.Data(), fCentBin);
@@ -928,6 +853,77 @@ void AliAnalysisTaskEmcalJetHadCorrAA::DoTrackLoop()
   bool doMixing; doMixing = kTRUE;
   if(doMixing) DoMixing(fCent, zvertex, trkArray);
 }
+
+/**
+ * This function performs a loop over the generated tracks
+ * in the current event and fills the relevant histograms.
+ */
+void AliAnalysisTaskEmcalJetHadCorrAA::DoMCTrackLoop()
+{ 
+
+  AliClusterContainer* clusCont = GetClusterContainer(0);
+
+  TObjArray *trkArray = new TObjArray; //Track array for event-mixing 
+  trkArray->SetOwner(kTRUE);
+
+  Double_t zvertex = -999;
+  zvertex = InputEvent()->GetPrimaryVertex()->GetZ();
+
+  // Fill zVertex and zBin
+  Int_t nZvtxBin = 10+1;
+  float zBinArray[] = {-10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10}; // 11 bins
+
+  int zBin = -1;
+  for(int izbin = 0; izbin<nZvtxBin; izbin++) {
+    if(zvertex == -999.) continue; // exclude what have initial value
+    float zBinMin = zBinArray[izbin];
+    float zBinMax = zBinArray[izbin+1];
+    if((zBinMin <= zvertex) && (zvertex < zBinMax)) zBin = izbin; // to fill from the 1st bin
+  }
+ 
+  TString histname;
+  TString groupname;
+  AliMCParticleContainer* mcpartCont = 0;
+  TIter next(&fParticleCollArray);
+  while ((mcpartCont = static_cast<AliMCParticleContainer*>(next()))) {
+    groupname = mcpartCont->GetName();
+    UInt_t count = 0;
+
+    for(auto mcpart : mcpartCont->accepted()) {
+      if (!mcpart) continue;
+      count++;
+
+      // Add tracks in the array for event-mixing 
+      //trkArray->Add(new AliPicoTrack(part->Pt(), part->Eta(), part->Phi(), part->Charge(), 0, 0, 0, 0));
+
+      // combination plot for projections
+      histname = TString::Format("%s/histTrackPhiEtaPt_%d", groupname.Data(), fCentBin);
+      fHistManager.FillTH3(histname, mcpart->Phi(), mcpart->Eta(), mcpart->Pt()); 
+
+      histname = TString::Format("%s/histTrackZvEta_%d", groupname.Data(), fCentBin);
+      fHistManager.FillTH2(histname, mcpart->Eta(), zvertex);
+ 
+      // To check z vertex dependency in delta eta distribution
+      ///histname = TString::Format("%s/histTrackPhiEtaPt_Zvtx_%d_%d", groupname.Data(), fCentBin, zBin);
+      ///fHistManager.FillTH3(histname, part->Phi(), part->Eta(), part->Pt());
+      histname = TString::Format("%s/histTrackPhiEta_Zvtx_%d_%d", groupname.Data(), fCentBin, zBin);
+      fHistManager.FillTH2(histname, mcpart->Phi(), mcpart->Eta());
+
+    }// partCont->accepted track loop
+    histname = TString::Format("%s/histNTracks_%d", groupname.Data(), fCentBin);
+    fHistManager.FillTH1(histname, count);
+
+  ////Printf("Number of tracks in MCLoop: %i", count);
+
+  }// End of ParticleContainer loop 
+
+  //` For event-mixing 
+  //bool doMixing; doMixing = kTRUE;
+  //if(doMixing) DoMixing(fCent, zvertex, trkArray);
+
+}
+
+
 
 /**
  * This function is executed automatically for the first event.
@@ -947,24 +943,30 @@ void AliAnalysisTaskEmcalJetHadCorrAA::ExecOnce()
  */
 Bool_t AliAnalysisTaskEmcalJetHadCorrAA::Run()
 {
-  
+
   AliVEvent *ev = InputEvent();
-  if (!fEventCut.AcceptEvent(ev)) {
+  fHistManager.FillTH1("BasicQA/hEventStatistics", "no cut", 1);
+
+  AliMultSelection *fMultSelection = static_cast<AliMultSelection*>(ev->FindListObject("MultSelection"));
+  if (fMultSelection) {  
+    fHistManager.FillTH1("BasicQA/hEventStatistics", "MultSelection", 1);    
+    fCent = fMultSelection->GetMultiplicityPercentile(fCentEst.Data());
+    fHistManager.FillTH2("BasicQA/hEventStatistics_2D", 1, fCent); 
+  } else {
+    AliWarning(Form("%s: Could not retrieve centrality information! Assuming 99", GetName()));
     return kFALSE;
   }
 
-/*  AliMultSelection *fMultSelection = static_cast<AliMultSelection*>(ev->FindListObject("MultSelection"));
-  if (fMultSelection) {
-    //fCent = fMultSelection->GetMultiplicityPercentile(fCentEst.Data());
-    fCent = fMultSelection->GetMultiplicityPercentile(fCentEst.Data(), kTRUE);
-    Int_t qual = fMultSelection->GetEvSelCode(); // modified by JY
-    //Printf("qual: %i", qual);
-    fHistCentrality_jy->Fill(fCent);
-    fHistQACentrality_jy->Fill(qual); // modified by JY
-  } else {
-    AliWarning(Form("%s: Could not retrieve centrality information! Assuming 99", GetName()));
-  }*/
-
+  Double_t zvertex = -999;
+  zvertex = InputEvent()->GetPrimaryVertex()->GetZ();
+  if(zvertex < -8. || zvertex > 8.) return kFALSE;
+  fHistManager.FillTH1("BasicQA/hEventStatistics", "vz cut", 1);
+  fHistManager.FillTH2("BasicQA/hEventStatistics_2D", 2, fCent); 
+   
+  if (!fEventCut.AcceptEvent(ev)) return kFALSE;
+  fHistManager.FillTH1("BasicQA/hEventStatistics", "Pileup Cut", 1);
+  fHistManager.FillTH2("BasicQA/hEventStatistics_2D", 3, fCent);
+    
   // pileup rejection (in your UserExec) - JY
   UInt_t fSelectMask= fInputHandler->IsEventSelected();
   Bool_t isINT7selected = fSelectMask& AliVEvent::kINT7;
@@ -978,15 +980,18 @@ Bool_t AliAnalysisTaskEmcalJetHadCorrAA::Run()
     if (!aodTrk1) continue;
     if (aodTrk1->TestFilterBit(128)) multTPC++;
   }
-  if(multEsd -3.38*multTPC<15000){
-    // keep the event 
-    return kTRUE;
+  if((multEsd -3.38*multTPC<15000)) { 
+    fHistManager.FillTH1("BasicQA/hEventStatistics", "Addtional", 1);
+    fHistManager.FillTH2("BasicQA/hEventStatistics_2D", 4, fCent);    
   }else{
-   // reject the event 
     return kFALSE;
   }
 
-  //return kTRUE;
+  //final centrality
+  fHistManager.FillTH1("BasicQA/hCentrality", fCent);
+
+  //All cuts are passed
+  return kTRUE;
 }
 
 /**
